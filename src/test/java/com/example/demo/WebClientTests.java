@@ -13,7 +13,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Hooks;
-
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.test.StepVerifier;
 import java.util.Optional;
 
 @AutoConfigureObservability(metrics = false)
@@ -44,14 +46,18 @@ class WebClientTests {
     @Test
     void spanIdToParentId() {
         TraceContext contextBeforeCall = tracer.currentSpan().context();
-        String responseTraceIds = blockingWebClientCall();
+        Mono<String> responseTraceIds = nonBlocking();
         TraceContext contextAfterCall = Optional.ofNullable(tracer.currentSpan()).map(Span::context).orElse(null);
 
-        Assertions.assertEquals(traceId + "-" + traceId, responseTraceIds, "response should contain trace ID from Tracer and from MDC");
-        Assertions.assertEquals(contextBeforeCall, contextAfterCall, "current context before and after blocking call should be the same");
+        StepVerifier.create(responseTraceIds)
+                .expectNext(traceId + "-" + traceId)
+                .verifyComplete();
+        Assertions.assertEquals(contextBeforeCall, contextAfterCall,
+                "current context before and after blocking call should be the same");
     }
 
-    private String blockingWebClientCall() {
+    private Mono<String> nonBlocking() { // ;p
+
         return webClientBuilder
                 .build()
                 .get()
@@ -59,7 +65,7 @@ class WebClientTests {
                 .header("hcitrace", "some-hci-trace")
                 .retrieve()
                 .bodyToMono(String.class)
-                .block();
+                .publishOn(Schedulers.immediate());
     }
 
 }
