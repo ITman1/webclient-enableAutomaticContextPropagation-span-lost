@@ -13,9 +13,10 @@ public class TestController {
     private Tracer tracer;
 
     @GetMapping("trace-id")
-    public String traceId() {
+    public String traceId() throws InterruptedException {
         String tracerTraceID = tracer.currentSpan().context().traceId();
         String mdcTraceID = MDC.get("traceId");
+        Thread.sleep(2000L);
         return tracerTraceID + "-" + mdcTraceID;
     }
 
